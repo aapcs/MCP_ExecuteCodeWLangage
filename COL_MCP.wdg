@@ -1,0 +1,47 @@
+#To edit and compare internal_properties, use WINDEV integrated tools.
+#Internal properties refer to the properties of controls in windows, reports, etc.
+info :
+ name : COL_MCP
+ major_version : 31
+ minor_version : 6
+ type : 7
+ description : ""
+ subtype : 0
+procedure_set :
+ identifier : 0x1ac26f5300120de1
+ internal_properties : IQAAACAAAAA/sPJK6oMXQvHe/6UcoDxmu24UStT77XAZeESItN6U1+tormzY
+ code_elements :
+  type_code : 31
+  p_codes : []
+  procedures :
+   -
+     name : ExecuteCodeWLangage
+     procedure_id : 1928226074346608383
+     type_code : 15
+     code : |1+
+      //!
+      //! @brief <indiquez ici ce que fait la procédure>
+      //!
+      //! @param code  <indiquez ici le rôle de code>
+      //!
+      //!
+      procédure ExecuteCodeWLangage(code)
+      
+      
+      
+      
+      
+      
+      
+     type : 458752
+  procedure_templates : []
+  property_templates : []
+ code_parameters :
+  internal_properties : IQAAACAAAAAFPuXd7fBX1/SiDTB6sHrfMZ5LqScVEUxNStUfcDtxIwFPEz+iD9Gkb2T8
+  original_name : COL_SansNom1
+resources :
+ string_res :
+  identifier : 0x1ac26f50001000a2
+  internal_properties : IQAAACAAAABDeCMfozZFpzgqxeIXhYeFdAaPGk00grp/EBDAJmpRaTMRIb1iTRNmLaK6
+custom_note :
+ internal_properties : IQAAACAAAADHMJbkzjYofeIDmEvswFy+SzkIk5HN+Jrst5U0+JApjeCrL9+4Iw==
