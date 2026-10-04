@@ -20,19 +20,152 @@ procedure_set :
      type_code : 15
      code : |1+
       //!
-      //! @brief <indiquez ici ce que fait la procédure>
+      //! @brief Exécute un code WLangage et renvoie son résultat. Sert à
       //!
-      //! @param code  <indiquez ici le rôle de code>
+      //! @param code (chaîne ANSI)  Corps d'une procédure WLangage, terminé par RENVOYER <valeur> pour obtenir un résultat.
       //!
+      //! @return (JSON)  Chaîne JSON : {succes:vrai, resultat, duree_ms} ou {succes:faux, etape, erreur, duree_ms},         etape valant parametre, compilation, execution, delai ou taille.
       //!
-      procédure ExecuteCodeWLangage(code)
+      //! @note  Sert à
+      //!  Sert à tester un code avant de le proposer.
+      //!              Pas d'interface : ni fenêtre, ni Info, ni Trace. Guillemets doublés comme dans tout code WLangage.
+      //! Garde-fous : fonctions dangereuses interdites à la compilation (écriture de fichiers, processus, réseau,
+      //! registre, écriture en base, DLL, code dynamique imbriqué, fenêtres), délai maximal de 10 secondes,
+      //! résultat limité à 50 000 caractères, journal de chaque appel à côté de l'exécutable.
+      //!
+      
+      procédure ExecuteCodeWLangage(local code est une chaîne) : JSON
+      <TOOL IA>
+      nom: execute_code_wlangage<§cs:14§>
+      libellé : Exécuter du code WLangage<§cs:14§>
+      description: Compile et exécute un code WLangage dans un thread (délai maximal 10 s) et renvoie le résultat, ou l'erreur de compilation ou d'exécution. Sert à tester un code avant de le proposer. Aucune interface (ni fenêtre, ni Info, ni Trace). Écriture de fichiers, réseau, processus, registre, DLL et écriture en base interdits.<§cs:14§>
+      paramètres:<§cs:14§>
+      	code: corps d'une procédure WLangage. RENVOYER <valeur> facultatif, sinon le résultat vaut null.<§cs:14§>
+      <FIN>
+      
+      nDélaiMax		est un entier	= 1000		// en centièmes de seconde (10 s)
+      nTailleMax		est un entier	= 50000
+      dhDébut			est une DateHeure	= DateHeureSys()
+      jRésultat		est un JSON
+      sRetour			est une chaîne
+      
+      si code = "" alors
+      	jRésultat.succes	= Faux
+      	jRésultat.etape		= "parametre"
+      	jRésultat.erreur	= "Le paramètre code est vide."
+      	renvoyer _Termine(jRésultat)
+      fin
+      
+      // Garde-fou 1 : fonctions interdites dans le code compilé (liste de défense, pas une isolation complète).
+      paramCompil est un CodeWLangageCompilation
+      paramCompil.FonctionsParDéfaut	= ToutesLesFonctions
+      paramCompil.FonctionsInterdites	= [
+      fSupprime
+      fRepSupprime
+      fRenomme
+      fDéplace
+      fCopieFichier
+      fCrée
+      fRepCrée
+      fSauveTexte
+      fSauveBuffer
+      fEcrit
+      fEcritLigne
+      LanceAppli
+      LanceAppliAssociée
+      FinProgramme
+      API
+      AppelDLL32
+      ChargeDLL
+      RegistreEcrit
+      RegistreCréeClé
+      RegistreSupprimeClé
+      RegistreSupprimeValeur
+      HTTPEnvoie
+      HTTPRequête
+      EmailEnvoieMessage
+      FTPConnecte
+      SocketConnecte
+      HOuvreConnexion
+      HChangeConnexion
+      HAjoute
+      HModifie
+      HEcrit
+      HSupprime
+      HSupprimeTout
+      HExécuteRequêteSQL
+      Compile
+      ExécuteCode
+      EvalueExpression
+      Info
+      Erreur
+      OuiNon
+      Confirmer
+      Dialogue
+      Ouvre
+      ]
+      
+      pCode est une Procédure = Compile(code+ RC + "RENVOYER Null", paramCompil)
+      si ErreurDétectée alors
+      	jRésultat.succes	= Faux
+      	jRésultat.etape		= "compilation"
+      	jRésultat.erreur	= ErreurInfo()
+      	renvoyer _Termine(jRésultat)
+      fin
+      
+      // Garde-fou 2 : exécution dans un thread, abandonnée au-delà du délai maximal (une boucle infinie ne bloque
+      // pas le serveur, mais le thread ne peut pas être tué : il reçoit seulement une demande d'arrêt).
+      t est un Thread(_ExécuteProtégé, (pCode))
+      ThreadExécute(t)
+      si pas ThreadAttend(t, nDélaiMax) alors
+      	ThreadDemandeArrêt(t)
+      	jRésultat.succes	= Faux
+      	jRésultat.etape		= "delai"
+      	jRésultat.erreur	= "Exécution abandonnée après " + (nDélaiMax / 100) + " s. Le thread continue tant qu'il ne se termine pas : redémarrer le serveur MCP si le processeur reste occupé."
+      	renvoyer _Termine(jRésultat)
+      fin
+      sRetour = t.ValeurRenvoyée
+      
+      // Garde-fou 3 : taille du résultat.
+      si Taille(sRetour) > nTailleMax alors
+      	jRésultat.succes	= Faux
+      	jRésultat.etape		= "taille"
+      	jRésultat.erreur	= "Résultat trop volumineux (" + Taille(sRetour) + " caractères, maximum " + nTailleMax + ")."
+      	jRésultat.apercu	= Gauche(sRetour, 2000)
+      	renvoyer _Termine(jRésultat)
+      fin
+      
+      jRésultat = sRetour
+      renvoyer _Termine(jRésultat)
       
       
+      	// Exécute la procédure compilée en interceptant les erreurs d'exécution.
+      	procédure interne _ExécuteProtégé(p est une Procédure) : chaîne
+      		j est un JSON
+      		quand exception dans
+      			v est un Variant = p()
+      			j.succes	= Vrai
+      			j.resultat	= v
+      		faire
+      			j.succes	= Faux
+      			j.etape		= "execution"
+      			j.erreur	= ExceptionInfo()
+      		fin
+      		renvoyer j..FormatJSON
+      	fin
       
-      
-      
-      
-      
+      	// Ajoute la durée, journalise l'appel (garde-fou 4) et renvoie le JSON.
+      	procédure interne _Termine(j est un JSON) : json
+      		dDurée est une Durée = DateHeureSys() - dhDébut
+      		j.duree_ms = dDurée..EnMillisecondes
+      		sStatut est une chaîne = "OK"
+      		si pas j.succes alors
+      			sStatut = "ECHEC " + j.etape
+      		fin
+      		sLigne est une chaîne = DateHeureVersChaîne(DateHeureSys(), "AAAA-MM-JJ HH:mm:SS") + TAB + sStatut + TAB + j.duree_ms + " ms" + TAB + Remplace(Gauche(code, 2000), RC, " ¶ ") + RC
+      		fAjouteTexte(fRepExe() + "\journal_ExecuteCodeWLangage.log", sLigne)
+      		renvoyer j
+      	fin
      type : 458752
   procedure_templates : []
   property_templates : []
